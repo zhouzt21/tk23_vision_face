@@ -1,0 +1,6 @@
+int32 state 
+---
+bool success
+string fail_log
+int32[] id
+string[] rec_info
