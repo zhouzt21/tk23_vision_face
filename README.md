@@ -14,15 +14,13 @@
 python demo.py
 ```
 
- 4. After using colcon to build the workspace, copy folder /lib (with two .so file right in it) in SDK, manually put under  /install/face_recognition_arcface/lib/python3.10/site-packages after 'colcon build' your workspace (need to change the version of python according to your environment, like "python3.x")
-
- 5. Run the face recognition node:
+ 4. Run the face recognition node:
     
 ```shell
 ros2 run face_recognition_arcface receptionist_face_task.py
 ```
 
- 6. Call the face registeration service:
+ 5. Call the face registeration service:
 
 ```shell
 ros2 service call /vision/face/register tinker_vision_msgs/FaceRegister "{state: 0}"
