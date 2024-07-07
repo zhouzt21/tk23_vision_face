@@ -5,7 +5,7 @@ import numpy as np
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image, CameraInfo
-from cv_bridge import CvBridge
+from cv_bridge import CvBridge, CvBridgeError
 from message_filters import ApproximateTimeSynchronizer,Subscriber
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup,ReentrantCallbackGroup
 
@@ -45,9 +45,9 @@ class ReceptionistFace(Node):
         # self.dep_topic = '/depth_to_rgb/image_raw'
         # self.caminfo_topic = '/rgb/camera_info'
         # realsense
-        self.rgb_topic = '/color/image_raw'
-        self.dep_topic = '/depth/image_rect_raw'
-        self.caminfo_topic = '/color/camera_info'
+        self.rgb_topic = '/camera/color/image_raw'
+        self.dep_topic = '/camera/depth/image_rect_raw'
+        self.caminfo_topic = '/camera/color/camera_info'
         ## service and topic
         self.register_service_name = '/vision/face/register'  
         # self.result_topic = '/vision/face/result' 
@@ -57,10 +57,10 @@ class ReceptionistFace(Node):
         self.timeout = 3
         self.cfg_pt_min = 50
 
-        self.rgb = Image()   # temporarily stored for registeration
+        self.rgb = None   
         self.camera_info=CameraInfo()   
 
-        self.state=-1  # 0: face registeration; 1: face recognition
+        self.state=-1  # 0: face registeration; 1: face comparation
 
         # data library
         self.lib_features = {}    # face library
@@ -130,7 +130,7 @@ class ReceptionistFace(Node):
         ## check out camera info ##
 
         self.bridge=CvBridge()
-        self.img_sync.registerCallback(self.img_cb)  ## for face recognition
+        self.img_sync.registerCallback(self.img_cb)  
         print("Face task server initialized.")
 
     def camera_callback(self, camera_msg):
@@ -150,10 +150,13 @@ class ReceptionistFace(Node):
     #     res_msg.success = False
     #     res_msg.fail_log = fail_log
 
-    def img_cb(self, rgb_msg, dep_msg):    
-        rgb_ori = self.bridge.imgmsg_to_cv2(rgb_msg, "bgr8")
-        dep = self.bridge.imgmsg_to_cv2(dep_msg, "32FC1")
-        self.rgb=rgb_ori
+    def img_cb(self, rgb_msg, dep_msg):
+        try:
+            rgb_ori = self.bridge.imgmsg_to_cv2(rgb_msg, "bgr8")
+            dep = self.bridge.imgmsg_to_cv2(dep_msg, "32FC1")
+            self.rgb = rgb_ori
+        except CvBridgeError as error:
+            print(error)
 
     # for service response when failed
     def execute_cb_fail(self, response, fail_log): 
@@ -171,7 +174,6 @@ class ReceptionistFace(Node):
             print("execute_cb: Face register executing ...")
 
             rgb = self.rgb 
-            # rgb= cv2.imread("/home/zzt/me_cropped.jpg")
     
             response = FaceRegister.Response()
             ok, faces = self.face_engine.ASFDetectFaces(rgb)
@@ -241,9 +243,10 @@ class ReceptionistFace(Node):
             self.state = -1    
             print("Face register succeeded.")   
             return response
+        
         elif request.state == 1:    
-            print("execute_cb: Face recognition executing ...")
-            # send rec_info[] when registration not when recognition, only send id[] when recognition
+            print("execute_cb: Face comparation executing ...")
+            # send rec_info[] when registration not when comparation, only send id[] when comparation
             self.state =1 
             rgb = self.rgb
 
@@ -266,7 +269,7 @@ class ReceptionistFace(Node):
                 if res != MOK:
                     self.execute_cb_fail(response, "One possible face's feature extract fail: " + str(ok))
                     continue     
-                max_conf = 0.5   # initial confidence level for face recognition
+                max_conf = 0.5   # initial confidence level for face comparation
                 max_id = -1  # initial id for the highest confidence level
 
                 for key, value in self.lib_features.items():
@@ -281,16 +284,16 @@ class ReceptionistFace(Node):
                         print("Face feature compare successful with: "+str(max_id)+ ", confidence_level:"+str(max_conf))
 
                 if max_id != -1:
-                    response.id.append(max_id) # result for face recognition
+                    response.id.append(max_id) # result for face comparation
                     response.success = True
-                    response.fail_log = "Success with No."+str(i) 
+                    response.fail_log = "Comparation success with No."+str(i) 
             
             if len(response.id) == 0:
                 self.execute_cb_fail(response, "No registered face is similar with input."+str(res))
                 self.state = -1    
                 return 
             else:
-                print("Face recognition succeeded.")
+                print("Face comparation succeeded.")
                 self.state = -1    
                 return response
 
@@ -298,7 +301,7 @@ class ReceptionistFace(Node):
             print("execute_cb: wrong request command" )
             return
                  
-            ###  extension: publish recognition result topic for visualization  ###     not work yet
+            ###  extension: publish comparation result topic for visualization  ###     not work yet
 
             # res_msg = FaceResult()
             # res_msg.header.stamp = rgb_msg.header.stamp
@@ -366,6 +369,7 @@ def main():
     rclpy.init()
     receptionist_face = ReceptionistFace()
     ## using "ros2 service call /vision/face/register tinker_vision_msgs/FaceRegister "{state: 0}" to register a face
+    ## using "ros2 service call /vision/face/register tinker_vision_msgs/FaceRegister "{state: 1}" to match a face
     rclpy.spin(receptionist_face)
     rclpy.shutdown()
 
