@@ -9,6 +9,7 @@ setup(
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
+        ( 'lib/' , ['lib/libarcsoft_face_engine.so', 'lib/libarcsoft_face.so' ] ),
         ('share/' + package_name, ['package.xml']),
     ],
     install_requires=['setuptools'],

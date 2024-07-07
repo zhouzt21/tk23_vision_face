@@ -1,5 +1,7 @@
 from .struct_info import *
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+root_dir = os.path.dirname(os.path.dirname(os.path.dirname(root_dir)))
+
 if platform=="win32":
     dll_msvcp = CDLL(r'{}/lib/msvcp120.dll'.format(root_dir))
     dll_msvcr = CDLL(r'{}/lib/msvcr120.dll'.format(root_dir))
